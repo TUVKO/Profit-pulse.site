@@ -294,6 +294,7 @@ tbody td{padding:13px 16px;font-size:13px;vertical-align:middle;}
       <div class="nav-item" onclick="showPage('pg-settings')"><span class="nav-icon">⚙️</span><span>Settings</span></div>
       <div class="nav-item" onclick="showPage('pg-admin-withdraw')"><span class="nav-icon">💵</span><span>Admin Withdraw</span></div>
       <div class="nav-item" onclick="showPage('pg-generate')"><span class="nav-icon">🧾</span><span>Generate Users</span></div>
+      <div class="nav-item" onclick="showPage('pg-generate-all')"><span class="nav-icon">📱</span><span>Generate All Users</span></div>
     </div>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="adminLogout()">🚪 Logout</button>
@@ -349,6 +350,14 @@ tbody td{padding:13px 16px;font-size:13px;vertical-align:middle;}
       <div class="page-sub">Phone numbers of all invested users and users with 4+ referrals (all levels)</div>
       <div style="margin-bottom:20px;"><button class="btn btn-save" onclick="generateUserLists()">⚡ Generate</button></div>
       <div id="gen-result"></div>
+    </div>
+
+    <!-- GENERATE ALL USERS -->
+    <div class="page" id="pg-generate-all">
+      <div class="page-title">Generate All Users</div>
+      <div class="page-sub">Phone numbers of every registered user</div>
+      <div style="margin-bottom:20px;"><button class="btn btn-save" onclick="generateAllUserLists()">⚡ Generate</button></div>
+      <div id="gen-all-result"></div>
     </div>
 
     <!-- TRANSACTIONS -->
@@ -1654,7 +1663,7 @@ function startNotifPurge() {
 }
 
 // ===== GENERATE USERS =====
-let genLists = { invested: [], refs: [], all: [] };
+let genLists = { all: [] };
 
 function genEsc(t) {
   return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1662,19 +1671,17 @@ function genEsc(t) {
 
 function generateUserLists() {
   const users = Object.values(allUsers || {});
-  const invested = [], refs = [], all = [];
-  const seenInv = new Set(), seenRef = new Set(), seenAll = new Set();
+  const all = [];
+  const seenAll = new Set();
   users.forEach(u => {
     const phone = (u.phone || '').toString().trim();
     if (!phone) return;
     const isInvested = (u.stake || 0) > 0;
     const refCount = u.referrals ? Object.keys(u.referrals).length : 0;
     const hasRefs = refCount >= 4;
-    if (isInvested && !seenInv.has(phone)) { seenInv.add(phone); invested.push(phone); }
-    if (hasRefs && !seenRef.has(phone)) { seenRef.add(phone); refs.push(phone); }
     if ((isInvested || hasRefs) && !seenAll.has(phone)) { seenAll.add(phone); all.push(phone); }
   });
-  genLists = { invested, refs, all };
+  genLists = { all };
   const block = (key, title, list) => `
     <div class="table-wrap">
       <div class="table-header">
@@ -1689,11 +1696,35 @@ function generateUserLists() {
           </div>`).join('') : '<div style="padding:20px;color:var(--muted);font-size:13px;">No users found.</div>'}
       </div>
     </div>`;
-  document.getElementById('gen-result').innerHTML =
-    block('invested', '💰 Invested users', invested) +
-    block('refs', '👥 4+ referrals', refs) +
-    block('all', '📋 Combined (no duplicates)', all);
+  document.getElementById('gen-result').innerHTML = block('all', '📋 All users', all);
   toast('✅ Generated: ' + all.length + ' unique numbers');
+}
+
+function generateAllUserLists() {
+  const all = [];
+  const seen = new Set();
+  Object.values(allUsers || {}).forEach(u => {
+    const phone = (u.phone || '').toString().trim();
+    if (!phone || seen.has(phone)) return;
+    seen.add(phone);
+    all.push(phone);
+  });
+  genLists.everyone = all;
+  document.getElementById('gen-all-result').innerHTML = `
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title">📱 All registered users (${all.length})</div>
+        <button class="btn btn-edit" onclick="copyGenList('everyone')" ${all.length ? '' : 'disabled'}>📋 Copy all</button>
+      </div>
+      <div style="max-height:360px;overflow-y:auto;">
+        ${all.length ? all.map((ph, i) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);">
+            <span class="mono" style="font-size:13px;">${genEsc(ph)}</span>
+            <button class="btn btn-edit" onclick="copyGenOne('everyone', ${i})">Copy</button>
+          </div>`).join('') : '<div style="padding:20px;color:var(--muted);font-size:13px;">No users found.</div>'}
+      </div>
+    </div>`;
+  toast('✅ Generated: ' + all.length + ' numbers');
 }
 
 function genCopyText(text, okMsg) {
@@ -1997,7 +2028,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const map = { 'pg-dashboard': 0, 'pg-users': 1, 'pg-tube': 2, 'pg-transactions': 3, 'pg-withdrawals': 4, 'pg-debit': 5, 'pg-sog': 6, 'pg-settings': 7, 'pg-admin-withdraw': 8, 'pg-generate': 9 };
+  const map = { 'pg-dashboard': 0, 'pg-users': 1, 'pg-tube': 2, 'pg-transactions': 3, 'pg-withdrawals': 4, 'pg-debit': 5, 'pg-sog': 6, 'pg-settings': 7, 'pg-admin-withdraw': 8, 'pg-generate': 9, 'pg-generate-all': 10 };
   if (map[id] !== undefined) document.querySelectorAll('.nav-item')[map[id]].classList.add('active');
   if (id === 'pg-transactions') renderAdminTransactions();
   if (id === 'pg-withdrawals') renderWithdrawalsTable();
